@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WOLFFY Mobile HW: Walk (A2)</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Fira+Code:wght@400;700&family=Oswald:wght@400;600;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        garage: {
+                            dark: '#0a0a0a',     /* Pitch Black */
+                            amp: '#171717',      /* Amp Tolex */
+                            tape: '#fef08a',     /* Masking Tape Yellow */
+                            red: '#ef4444',      /* Overdrive Red */
+                            steel: '#4b5563',    /* Pedal Steel */
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        display: ['Oswald', 'sans-serif'],
+                        marker: ['"Permanent Marker"', 'cursive'],
+                        mono: ['"Fira Code"', 'monospace']
+                    },
+                    boxShadow: {
+                        'neon-red': '0 0 15px rgba(239,68,68,0.5), inset 0 0 10px rgba(239,68,68,0.2)',
+                        'neon-tape': '0 0 15px rgba(254,240,138,0.4)',
+                        'panel': 'inset 0 2px 10px rgba(255,255,255,0.05), 0 10px 30px rgba(0,0,0,0.8)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Base & Resets */
+        body {
+            background-color: #0a0a0a;
+            background-image: radial-gradient(circle at 50% 50%, #1f1f1f 0%, #0a0a0a 100%);
+            color: #f5f5f5;
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        /* Mobile Wrapper Simulator */
+        .mobile-wrapper {
+            width: 100%;
+            max-width: 430px;
+            height: 100vh;
+            max-height: 100vh;
+            background-color: #0a0a0a;
+            position: relative;
+            overflow-x: hidden;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+        
+        @media (min-width: 640px) {
+            .mobile-wrapper {
+                height: 90vh;
+                border-radius: 40px;
+                border: 8px solid #171717;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), inset 0 0 0 4px #222;
+            }
+        }
+
+        /* Custom Scrollbar */
+        .mobile-wrapper::-webkit-scrollbar { width: 4px; }
+        .mobile-wrapper::-webkit-scrollbar-track { background: #000; }
+        .mobile-wrapper::-webkit-scrollbar-thumb { background: #ef4444; border-radius: 10px; }
+
+        /* Card styles */
+        .question-card {
+            background-color: #171717;
+            border: 2px solid #333;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .question-card.active {
+            border-color: #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+        }
+
+        .option-btn {
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+            background-color: #111;
+        }
+        .option-btn:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.1);
+            border-left-color: #ef4444;
+            transform: translateX(4px);
+        }
+        .option-btn.correct { background-color: #10b981 !important; color: white !important; border-left-color: #047857 !important; font-weight: bold; box-shadow: 0 0 10px rgba(16,185,129,0.4);}
+        .option-btn.wrong { background-color: #ef4444 !important; color: white !important; border-left-color: #991b1b !important; font-weight: bold; box-shadow: 0 0 10px rgba(239,68,68,0.4);}
+        .option-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; border-color: #ef4444 !important;}
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(3px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+            40%, 60% { transform: translate3d(5px, 0, 0); }
+        }
+
+        .confetti { position: absolute; width: 6px; height: 16px; opacity: 0; z-index: 100; border-radius: 2px;}
+        @keyframes fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+
+        .progress-point { transition: all 0.3s; }
+        .progress-point.filled { background-color: #ef4444; box-shadow: 0 0 8px #ef4444; border-color: #ef4444; }
+
+        /* Tape Spin */
+        .tape-spin { animation: spin 4s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-wrapper" id="app-container">
+        
+        <!-- Sticky Header with Progress -->
+        <header class="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#333] px-6 pt-5 pb-3 shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 class="font-display font-black text-garage-red tracking-widest text-xl uppercase">WOLFFY <span class="text-white">A2</span></h1>
+                    <p class="font-mono text-[10px] text-gray-400 uppercase tracking-widest font-bold">HW TAPE • FOO FIGHTERS</p>
+                </div>
+                <div class="text-right bg-[#171717] px-3 py-1 rounded border border-[#333]">
+                    <span id="score-counter" class="font-mono text-xs font-bold text-garage-tape tracking-widest">0/15 HITS</span>
+                </div>
+            </div>
+            <!-- Visual Progress Dots -->
+            <div class="flex justify-between gap-1 mb-1" id="progress-container">
+                <!-- Dots injected via JS -->
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="p-4 pb-32 space-y-6">
+            
+            <!-- Intro Data Disc -->
+            <div class="bg-[#171717] p-5 rounded-xl shadow-panel border border-[#333] relative overflow-hidden flex flex-col items-center text-center">
+                <div class="w-24 h-24 rounded-full border-4 border-garage-red border-t-transparent animate-spin mb-4 shadow-neon-red flex items-center justify-center">
+                    <div class="w-20 h-20 rounded-full overflow-hidden tape-spin border-2 border-black" style="animation-duration: 3s;">
+                        <img src="https://upload.wikimedia.org/wikipedia/en/3/30/FooFightersWastingLight.jpg" class="w-full h-full object-cover grayscale opacity-90">
+                    </div>
+                </div>
+
+                <div class="w-full bg-[#000] mt-2 p-3 text-center border border-[#333] rounded-lg">
+                    <h2 class="font-display font-black text-white text-2xl uppercase leading-none tracking-wide">Garage Quiz</h2>
+                    <p class="font-mono text-[10px] font-bold text-garage-tape mt-1 uppercase tracking-widest">Verb+TO & Processes</p>
+                </div>
+            </div>
+
+            <!-- Quiz Questions Container -->
+            <div id="quiz-container" class="space-y-6 relative z-10">
+                <!-- Questions will be injected here -->
+            </div>
+
+        </main>
+
+        <!-- Fixed Submit Button Footer -->
+        <div class="sticky bottom-0 left-0 w-full bg-gradient-to-t from-[#000] via-[#0a0a0a] to-transparent pt-12 pb-6 px-6 z-50">
+            <button id="submit-btn" onclick="checkAllAndSubmit()" class="w-full bg-garage-red text-white font-display font-black text-2xl tracking-widest uppercase py-4 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all active:scale-95 flex items-center justify-center gap-3 border-2 border-transparent hover:bg-[#000] hover:text-garage-red hover:border-garage-red">
+                <i class="fa-solid fa-bolt"></i>
+                FINISH TAPE
+            </button>
+        </div>
+
+        <!-- Success Overlay -->
+        <div id="success-overlay" class="fixed inset-0 bg-[#0a0a0a]/95 z-[100] flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 hidden">
+            <div class="w-32 h-32 bg-[#171717] border-4 border-garage-tape rounded-full flex items-center justify-center mb-6 shadow-neon-tape transform scale-50 transition-transform duration-500" id="success-badge">
+                <span class="text-6xl text-garage-tape">🤘</span>
+            </div>
+            <h1 class="font-display font-black text-5xl text-white mb-2 text-center uppercase tracking-widest">ROCK LEGEND!</h1>
+            <div class="bg-[#171717] border border-[#333] px-8 py-2 rounded-xl mb-6 mt-4 shadow-panel">
+                <div class="font-mono text-garage-red text-2xl font-bold tracking-widest" id="final-score">SCORE: 15/15</div>
+            </div>
+            <p class="font-sans text-gray-400 text-sm mb-10 text-center max-w-[280px]">You mastered the processes and the verbs. The teacher is proud.</p>
+            <button onclick="location.reload()" class="bg-transparent border-2 border-garage-tape text-garage-tape font-display font-bold px-10 py-4 rounded-xl uppercase text-xl tracking-widest hover:bg-garage-tape hover:text-black transition-colors shadow-neon-tape">PLAY ENCORE</button>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        const quizData = [
+            { q: "1. 'I am learning ______ walk again.'", a: ["for", "to", "at"], c: 1 },
+            { q: "2. 'I want ______ sleep.'", a: ["to", "do", "for"], c: 0 },
+            { q: "3. 'She is learning ______ play the guitar.'", a: ["to", "for", "at"], c: 0 },
+            { q: "4. What does 'Start over' mean?", a: ["To begin again.", "To run fast.", "To sleep."], c: 0 },
+            { q: "5. 'I ______ learning English these days.'", a: ["is", "am", "are"], c: 1 },
+            { q: "6. 'Survive' means...", a: ["To cook dinner.", "To continue to live.", "To build a house."], c: 1 },
+            { q: "7. Which sentence describes an ongoing process in your life?", a: ["I walk to school.", "I walked yesterday.", "I am learning to drive."], c: 2 },
+            { q: "8. 'Wait' means...", a: ["To run away.", "To start over.", "To stay where you are until something happens."], c: 2 },
+            { q: "9. 'They ______ studying for the test this week.'", a: ["are", "am", "is"], c: 0 },
+            { q: "10. What is a 'conqueror'?", a: ["A person who wins or takes control.", "A type of guitar.", "A beautiful flower."], c: 0 },
+            { q: "11. 'I never want ______ die.'", a: ["to", "for", "in"], c: 0 },
+            { q: "12. What does 'Pray' mean?", a: ["To speak to God.", "To play a game.", "To sing a song."], c: 0 },
+            { q: "13. 'He ______ trying to find a job right now.'", a: ["am", "are", "is"], c: 2 },
+            { q: "14. A 'Grave' is...", a: ["A bright fire.", "A place where a dead person is buried.", "A safe place."], c: 1 },
+            { q: "15. The song 'Walk' is about...", a: ["Sleeping all day.", "Not giving up and starting over.", "Cooking."], c: 1 }
+        ];
+
+        let userAnswers = Array(15).fill(null);
+        let solvedCount = 0;
+
+        function initQuiz() {
+            const container = document.getElementById('quiz-container');
+            const progress = document.getElementById('progress-container');
+            
+            quizData.forEach((item, idx) => {
+                // Create Progress Dot
+                const dot = document.createElement('div');
+                dot.className = `h-1.5 flex-1 bg-[#222] rounded-full progress-point dot-${idx}`;
+                progress.appendChild(dot);
+
+                // Create Card
+                const card = document.createElement('div');
+                card.className = `question-card rounded-xl p-5 shadow-lg q-card-${idx}`;
+                card.innerHTML = `
+                    <p class="font-sans text-lg font-bold mb-4 tracking-wide text-white leading-snug">${item.q}</p>
+                    <div class="grid grid-cols-1 gap-2 font-mono font-bold text-xs uppercase">
+                        ${item.a.map((opt, oIdx) => `
+                            <button class="option-btn border border-[#333] text-gray-300 py-4 px-4 rounded-lg text-left flex items-center justify-between group btn-${idx}-${oIdx}" onclick="answer(${idx}, ${oIdx})">
+                                <span>${opt}</span>
+                                <div class="w-4 h-4 rounded border border-gray-600 group-hover:border-garage-red transition-colors flex items-center justify-center text-[10px]"></div>
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function answer(qIdx, oIdx) {
+            if (userAnswers[qIdx] !== null) return; // Locked once answered
+
+            const correct = quizData[qIdx].c;
+            const btn = document.querySelector(`.btn-${qIdx}-${oIdx}`);
+            const card = document.querySelector(`.q-card-${qIdx}`);
+            const dot = document.querySelector(`.dot-${qIdx}`);
+            const allBtnsInCard = card.querySelectorAll('.option-btn');
+
+            // Disable all buttons in this card
+            allBtnsInCard.forEach(b => b.disabled = true);
+
+            if (oIdx === correct) {
+                // Correct
+                btn.classList.add('correct');
+                btn.classList.remove('text-gray-300', 'bg-[#111]');
+                btn.querySelector('div').innerHTML = '<i class="fa-solid fa-check"></i>';
+                btn.querySelector('div').className = 'w-4 h-4 flex items-center justify-center text-[10px] border-none text-white';
+                userAnswers[qIdx] = true;
+            } else {
+                // Wrong
+                btn.classList.add('wrong');
+                btn.classList.remove('text-gray-300', 'bg-[#111]');
+                btn.querySelector('div').innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                btn.querySelector('div').className = 'w-4 h-4 flex items-center justify-center text-[10px] border-none text-white';
+                
+                // Highlight correct one too
+                const correctBtn = document.querySelector(`.btn-${qIdx}-${correct}`);
+                correctBtn.classList.add('correct');
+                correctBtn.classList.remove('text-gray-300', 'bg-[#111]');
+                correctBtn.querySelector('div').innerHTML = '<i class="fa-solid fa-check"></i>';
+                correctBtn.querySelector('div').className = 'w-4 h-4 flex items-center justify-center text-[10px] border-none text-white';
+                
+                card.classList.add('shake');
+                userAnswers[qIdx] = false;
+            }
+
+            dot.classList.add('filled');
+            solvedCount++;
+            updateHeader();
+        }
+
+        function updateHeader() {
+            const scoreLabel = document.getElementById('score-counter');
+            scoreLabel.innerText = `${solvedCount}/15 HITS`;
+            
+            // Visual feedback on header update
+            scoreLabel.classList.add('text-white');
+            scoreLabel.classList.remove('text-garage-tape');
+            setTimeout(() => {
+                scoreLabel.classList.remove('text-white');
+                scoreLabel.classList.add('text-garage-tape');
+            }, 300);
+        }
+
+        function checkAllAndSubmit() {
+            if (solvedCount < 15) {
+                const btn = document.getElementById('submit-btn');
+                btn.classList.add('shake', 'bg-garage-tape', 'text-black', 'border-garage-tape');
+                btn.classList.remove('bg-garage-red', 'text-white', 'border-transparent');
+                btn.innerHTML = "INCOMPLETE DATA!";
+                setTimeout(() => {
+                    btn.classList.remove('shake', 'bg-garage-tape', 'text-black', 'border-garage-tape');
+                    btn.classList.add('bg-garage-red', 'text-white', 'border-transparent');
+                    btn.innerHTML = `<i class="fa-solid fa-bolt"></i> FINISH TAPE`;
+                }, 1500);
+                return;
+            }
+
+            // Calculate final score
+            const finalCorrect = userAnswers.filter(a => a === true).length;
+            const overlay = document.getElementById('success-overlay');
+            const badge = document.getElementById('success-badge');
+            
+            document.getElementById('final-score').innerText = `SCORE: ${finalCorrect} / 15`;
+            
+            overlay.style.display = 'flex';
+            void overlay.offsetWidth;
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+            
+            setTimeout(() => {
+                badge.classList.remove('scale-50');
+                badge.classList.add('scale-100');
+                shootConfetti();
+            }, 100);
+        }
+
+        function shootConfetti() {
+            const container = document.getElementById('app-container');
+            const colors = ['#ef4444', '#fef08a', '#ffffff'];
+            for(let i=0; i<60; i++) {
+                let c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+                c.style.left = Math.random() * 100 + '%';
+                c.style.animation = `fall ${Math.random()*2+2}s linear forwards`;
+                c.style.animationDelay = Math.random()*0.5+'s';
+                container.appendChild(c);
+                setTimeout(() => c.remove(), 4000);
+            }
+        }
+
+        window.onload = initQuiz;
+    </script>
+</body>
+</html>
